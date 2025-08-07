@@ -1,0 +1,70 @@
+# ===================================================================
+#               Configuration File for PhonoMatic
+# ===================================================================
+
+# --- File and Directory Paths ---
+# Central location for all inputs and outputs.
+paths:
+  # Directory where your initial crystal structure files (e.g., POSCAR, cif) are stored.
+  structures_dir: "/path/to/your/project/structures"
+
+  # Full path to your trained Machine Learning Interatomic Potential model file.
+  mlip_model_path: "/path/to/your/mlip_models/MACE_model_v1.model"
+
+  # Main directory where all calculation results will be saved.
+  output_dir: "/path/to/your/project/results"
+
+
+# --- HPC Job Submission Settings ---
+# Settings for submitting jobs to a scheduler like Slurm.
+hpc:
+  # The job scheduler on your cluster (e.g., slurm, pbs).
+  scheduler: "slurm"
+
+  # The queue or partition to submit jobs to.
+  partition: "gpu-short" # Or 'compute', 'debug', etc.
+
+  # Your project account for billing compute time.
+  account: "your_account_name"
+
+  # List of environment modules to load before running the code.
+  modules_to_load:
+    - "python/3.11"
+    - "cuda/12.1"
+    - "openmpi/4.1.5"
+
+
+# --- Phonon Calculation Parameters ---
+# Settings for the phonopy workflow.
+phonopy_settings:
+  # Supercell dimensions for the phonon calculation.
+  supercell_matrix: [2, 2, 2]
+
+  # Atomic displacement distance in Angstroms.
+  displacement_distance: 0.015
+
+  # The q-point mesh for calculating DOS and thermal properties.
+  mesh_density: [80, 80, 80]
+
+
+# --- Calculator Specifics ---
+# Details for the MLIP and DFT calculators.
+calculators:
+  # Machine Learning Interatomic Potential (MLIP) settings.
+  mlip:
+    # The type of MLIP model (used to select the correct calculator class).
+    model_type: "mace"
+    
+    # Device to run the calculation on ('cuda' for GPU, 'cpu' for CPU).
+    device: "cuda"
+    
+    # Default data type for calculations. 'float64' is recommended for force accuracy.
+    dtype: "float64"
+
+  # Density Functional Theory (DFT) settings (for comparison runs).
+  dft:
+    # The DFT code being used.
+    code: "vasp"
+    
+    # The command used to execute the DFT code in the terminal.
+    executable: "vasp_std"
