@@ -50,7 +50,7 @@ def write_band_structure(phonon, output_path):
     Saves the phonon band structure to a YAML file.
 
     Args:
-        phonon (Phonopy): The Phonopy object with band structure.
+        phonon (Phonopy): The Phonopy object.
         output_prefix (Path): Directory where band.yaml will be saved.
     """
     try:
@@ -83,7 +83,6 @@ def write_total_dos(phonon, output_path):
     Args:
         phonon (Phonopy): The Phonopy object.
         output_path (Path): Directory where total_dos.dat will be saved.
-        mesh (int): Mesh density for DOS calculation.
     """
     try:
         # Running the mesh again is not necessary as long as we previously ran 
