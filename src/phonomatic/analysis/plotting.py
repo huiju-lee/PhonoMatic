@@ -79,9 +79,8 @@ def _get_method_and_material(band_yaml_path):
             band taml file were computed (either mlip or dft). 
     """
     parent_folder = Path(band_yaml_path).parent.name
-    # Expect pattern like POSCAR-<material>-<index>-<method>
+    
     # We want to capture material-index as title and method as label
-
     pattern = r"POSCAR-([A-Za-z0-9]+-[0-9]+)-(mlip|dft)$"
     match = re.match(pattern, parent_folder)
     if match:
@@ -113,14 +112,20 @@ def plot_phonon_dispersion(yaml_files, output_path=None,
     """
     # Define output path directory, make it if it does not exist
     if output_path is None:
-        output_path = Path.cwd() / "visualizations"
-        output_path.mkdir(parents=True, exist_ok=True)  
+        output_path = Path.cwd() / "visualizations" / "bandplot.png"
     else:
         output_path = Path(output_path)
-
-    # If output_path is a directory, define a default filename inside it
-    if output_path.is_dir():
+    
+    # If it looks like a directory or is an existing directory, 
+    # make it and add bandplot.png filename
+    if output_path.suffix == "" or output_path.is_dir():
+        output_path.mkdir(parents=True, exist_ok=True)
         output_path = output_path / "bandplot.png"
+    # If the user specified a filename, make the parent directory if it does
+    # not yet exist 
+    else:
+        # Make sure the parent dir exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Get method labels if none are passed
     if labels is None:
@@ -175,6 +180,7 @@ def plot_phonon_dispersion(yaml_files, output_path=None,
     plt.title(title)
     plt.legend()
     plt.xlim(min(dist), max(dist))
+    plt.axhline(0, linestyle='--', color='lightcoral', lw=0.3)
     plt.tight_layout()
     plt.savefig(output_path, dpi=300)
     plt.close()
