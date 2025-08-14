@@ -323,8 +323,8 @@ def plot_all_dispersion_curves(results_dir, output_pdf=None, styles=None,
             if common_legend:
                 handles, labels = axs[0].get_legend_handles_labels()
                 default_legend_args = dict(
-                    loc="center left",
-                    bbox_to_anchor=(1.02, 0.5),
+                    loc="upper center",
+                    bbox_to_anchor=(0.5, -0.05),
                     fontsize=10,
                     ncol=1
                 )
@@ -335,5 +335,5 @@ def plot_all_dispersion_curves(results_dir, output_pdf=None, styles=None,
                 # Add legend
                 fig.legend(handles, labels, **legend_args)
 
-            pdf.savefig(fig)
+            pdf.savefig(fig, bbox_inches="tight")
             plt.close(fig)
