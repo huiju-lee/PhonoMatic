@@ -142,25 +142,34 @@ def _get_page_layout(plots_this_page):
     return int(n_row), n_col
 
 
-def _make_dispersion_page(batch, styles, common_legend,
-                          legend_params, **plotting_args):
+def _make_dispersion_page(batch, 
+                          line_styles, 
+                          common_legend,
+                          legend_params, 
+                          axis_kwargs,
+                          figure_kwargs,
+                          postprocess):
     """
-    Creates a single page of phonon dispersion plots. 
-
+    Creates a single page of phonon dispersion plots.
+    
     Args:
         batch (list of list of Path): Paths to band.yaml datasets for 
             plotting.
-        styles (list of dict): Matplotlib style kwargs for each dataset used
-            to make a single plot. 
-        common_legend (Bool): Whether to add a common legend on the page. 
-        legend_params (dict):  Optional keyword arguments passed to 
-            `fig.legend()` if common_legend is True.
-        **plotting_args: Additional kwargs for figure customization (figsize,
-            xlabel, ylabel, etc.).
-
+        line_styles (list of dict): Matplotlib style kwargs for the datasets 
+            used to make a single plot.
+        common_legend (bool): Whether to add a common legend on the page.
+        legend_params (dict): Optional keyword arguments passed to 
+            `fig.legend()`if common_legend is True.
+        axis_kwargs (dict): Axis customization options for each plot 
+            (xlabel, ylabel, tick_params, title, etc.).
+        figure_kwargs (dict): Figure customization options (e.g., figsize).
+        postprocess (callable): Function taking an `ax` for additional 
+            customization of each subplot.
+    
     Returns:
         fig (matplotlib.figure.Figure): The page of phonon dispersion curves.
     """
+
     # Define layout for this page
     n_row, n_col = _get_page_layout(len(batch))
     fig, axs = plt.subplots(n_row, n_col, 
@@ -172,8 +181,14 @@ def _make_dispersion_page(batch, styles, common_legend,
 
     # Plot each phonon dispersion curve in batch
     for ax, yaml_group in zip(axs, batch):
-        plot_phonon_dispersion(yaml_group, ax=ax, 
-                               styles=styles, **plotting_args)
+        plot_phonon_dispersion(
+            yaml_group,
+            ax=ax,
+            line_styles=line_styles,
+            axis_kwargs=axis_kwargs,
+            figure_kwargs=figure_kwargs,
+            postprocess=postprocess,
+        )
 
     # Turn off unused subplots
     for ax in axs[len(batch):]:
@@ -191,29 +206,35 @@ def _make_dispersion_page(batch, styles, common_legend,
     return fig
             
         
-def plot_all_dispersion_curves(results_dir, output_pdf=None, styles=None,
+def plot_all_dispersion_curves(results_dir,
+                               output_pdf=None, 
+                               line_styles=None,
                                max_plots_per_page=40,
                                common_legend=True,
                                legend_params=None, 
-                               **plotting_args):
+                               axis_kwargs=None, 
+                               figure_kwargs=None,
+                               postprocess=None):
     """
     Plots phonon dispersion curves for all materials contained in a
     provided results directory. Organizes the figures in a PDF document. 
 
-    Args: 
-        results_dir (Path): Directories containing outputs of Phonopy 
+    Args:
+        results_dir (Path): Directory containing outputs of Phonopy 
             computations.
-        output_pdf (Path): Path to the desired output PDF file. 
-        styles (list of dict): Matplotlib style kwargs for the datasets used
-            to make a single plot. 
-        max_plots_per_page (int): The maximum number of plots to be placed on
-            a single page of the output PDF document.
-        common_legend (Bool): Whether to add a common legend on each page of 
-            the PDF output file. 
-        legend_params (dict):  Optional keyword arguments passed to 
-            `fig.legend()` if common_legend is True.
-        **plotting_args: Additional kwargs for figure customization (figsize,
-            xlabel, ylabel, etc.).
+        output_pdf (Path): Path to the desired output PDF file.
+        line_styles (list of dict): Matplotlib style kwargs for the datasets
+            used to make a single plot.
+        max_plots_per_page (int): Maximum number of plots to place on a 
+            single page of the PDF.
+        common_legend (bool): Whether to add a common legend on each page.
+        legend_params (dict): Optional keyword arguments passed to `fig.legend()`
+            if common_legend is True.
+        axis_kwargs (dict): Axis customization options for each plot (xlabel, ylabel,
+            tick_params, title, etc.).
+        figure_kwargs (dict): Figure customization options.
+        postprocess (callable): Function taking an `ax` for additional customization
+            of each subplot.
     """
     results_dir = Path(results_dir)
     
@@ -242,8 +263,13 @@ def plot_all_dispersion_curves(results_dir, output_pdf=None, styles=None,
 
     # Create each page
     figures = [
-        _make_dispersion_page(batch, styles, common_legend, 
-                              legend_params, **plotting_args)
+        _make_dispersion_page(batch,
+                              line_styles=line_styles,
+                              common_legend=common_legend,
+                              legend_params=legend_params,
+                              axis_kwargs=axis_kwargs,
+                              figure_kwargs=figure_kwargs,
+                              postprocess=postprocess)
         for batch in batched_paths
     ]
 
