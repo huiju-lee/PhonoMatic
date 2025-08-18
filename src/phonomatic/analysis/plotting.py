@@ -12,8 +12,17 @@ from itertools import accumulate
 from pathlib import Path
     
         
-def plot_phonon_dispersion(yaml_files, output_path=None,
-        labels=None, styles=None, ax=None, **plotting_args):
+def plot_phonon_dispersion(
+        yaml_files, 
+        output_path=None,
+        labels=None, 
+        line_styles=None,
+        axis_kwargs=None,
+        figure_kwargs=None, 
+        legend_kwargs=None, 
+        postprocess=None, 
+        ax=None
+    ):
     """
     Plot phonon dispersion curves from a list of phonopy band.yaml files.
 
@@ -22,38 +31,44 @@ def plot_phonon_dispersion(yaml_files, output_path=None,
 
     Args:
         yaml_files (list of Path or str): Paths to band.yaml files.
-        output_path (Path or str): Path to save the output plot (default 
+        output_path (Path or str): Path to save the output plot (default
             bandplot.png).
         labels (list of str): Legend labels for each dataset. If None, 
-            filenames are used.
-        styles (list of dict): Matplotlib style kwargs for each dataset.
+            the computation methods are used.
+        line_styles (list of dict): Matplotlib style kwargs for each dataset.
+        axis_kwargs (dict): Axis customization options (xlabel, ylabel, 
+            tick_params, etc.).
+        figure_kwargs (dict): Figure customization options (e.g. figsize).
+        legend_kwargs (dict): Legend customization options.
+        postprocess (callable): Function taking `ax` for additional 
+            customization.
         ax (matplotlib.axes.Axes): Optional axis to plot into.
-        **plotting_args: Additional kwargs for figure customization (figsize,
-            xlabel, ylabel, etc.).
     """
     # Prepare labels and styles
     if labels is None:
         labels = [get_method_and_material(f)[0] for f in yaml_files]
-    if styles is None:
-        styles = [{'color': 'C' + str(i)} for i in range(len(yaml_files))]
+    if line_styles is None:
+        # Cycle through styles if we run out
+        line_styles = [{'color': 'C' + str(i)} 
+                       for i in range(len(yaml_files))]
 
     # Load first dataset for x-ticks and metadata
     dist, freqs, xtick_labels, seg_nqpoint, npath = (
         load_band_yaml(yaml_files[0])
     )
 
-    # Decide whether to create our own figure
+    # Decide whether to create our own figure - we do if none was passed
     own_fig = False
     if ax is None:
         own_fig = True
         output_path = create_output_file(output_path, "band_plot.png")
+        default_figure_kwargs = {"figsize": (4, 4)}
+        # Merge user-supplied figure kwargs with defaults
+        figure_kwargs = {**default_figure_kwargs, **(figure_kwargs or {})}
+        fig, ax = plt.subplots(**figure_kwargs)
 
-        fig, ax = plt.subplots(figsize=plotting_args.get("figsize", (4, 4)))
-
-    xlabel = plotting_args.get("xlabel", "Wave vector")
-    ylabel = plotting_args.get("ylabel", "Frequency (THz)")
-    title = plotting_args.get("title", get_method_and_material(yaml_files[0])[1])
-    tick_params = plotting_args.get(
+    axis_kwargs = axis_kwargs or {}
+    tick_params = axis_kwargs.get(
         "tick_params",
         dict(axis='both', direction='in', top=True, right=True)
     )
@@ -68,27 +83,40 @@ def plot_phonon_dispersion(yaml_files, output_path=None,
     ax.tick_params(**tick_params)
 
     # Plot datasets
-    for yaml_file, label, style in zip(yaml_files, labels, styles):
+    for yaml_file, label, style in zip(yaml_files, labels, line_styles):
         dist, freqs, _, _, _ = load_band_yaml(yaml_file)
         for j in range(freqs.shape[0]):
             ax.plot(dist, freqs[j], label=label if j == 0 else "", **style)
 
-    ax.set_title(title)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
+    # Annotate with axis labels
+    ax.set_xlabel(axis_kwargs.get("xlabel", "Wave vector"), 
+                  fontdict=axis_kwargs.get("xlabel_fontdict", {}))
+    ax.set_ylabel(axis_kwargs.get("ylabel", "Frequency (THz)"), 
+                  fontdict=axis_kwargs.get("ylabel_fontdict", {}))
+    # Default title is material ID
+    ax.set_title(axis_kwargs.get("title", 
+                                 get_method_and_material(yaml_files[0])[1]), 
+                 fontdict=axis_kwargs.get("title_fontdict", {}))
+
+    # Set x-axis limits, plot 0-frequency line
     ax.set_xlim(min(dist), max(dist))
     ax.axhline(0, linestyle='--', color='lightcoral', lw=0.3)
 
+    # Let the user make additional stylistic changes beyond the parameters
+    # included in this function
+    if postprocess:
+        postprocess(ax)
+
     # Save as a single file if we are generating one figure in isolation
     if own_fig:
-        ax.legend()
+        ax.legend(**(legend_kwargs or {}))
         plt.tight_layout()
         save_figure(fig, output_path, file_name="band_plot.png", dpi=300)
 
 
 def _get_page_layout(plots_this_page):
     """
-    Helper function to determine the arrangment of plots on a single page.
+    Helper function to determine the arrangement of plots on a single page.
     
     NOTE: I am choosing to keep this in the plotting module for now because 
     it has to do with the visual layout of our plots. It does not read or
