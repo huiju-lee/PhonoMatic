@@ -21,8 +21,8 @@ def plot_phonon_dispersion(
         figure_kwargs=None, 
         legend_kwargs=None, 
         postprocess=None, 
-        ax=None
-    ):
+        ax=None    
+):
     """
     Plot phonon dispersion curves from a list of phonopy band.yaml files.
 
@@ -257,16 +257,18 @@ def _make_dispersion_page(
     return fig
             
         
-def plot_all_dispersion_curves(results_dir,
-                               output_pdf=None, 
-                               line_styles=None,
-                               max_plots_per_page=40,
-                               common_legend=True,
-                               legend_params=None, 
-                               axis_kwargs=None, 
-                               figure_kwargs=None,
-                               postprocess_subplot=None, 
-                               postprocess_page=None):
+def plot_all_dispersion_curves(
+        results_dir,
+        output_pdf=None, 
+        line_styles=None,
+        max_plots_per_page=40,
+        common_legend=True,
+        legend_params=None, 
+        axis_kwargs=None, 
+        figure_kwargs=None,
+        postprocess_subplot=None, 
+        postprocess_page=None
+):
     """
     Plots phonon dispersion curves for all materials contained in a
     provided results directory. Organizes the figures in a PDF document. 
