@@ -111,7 +111,7 @@ def write_projected_dos(phonon, output_path):
     """
     try: 
         phonon.run_projected_dos()
-        phonon.write_total_dos(filename=output_path)
+        phonon.write_projected_dos(filename=output_path)
     except Exception as e: 
         print(f"[WARNING] Could not write projected DOS: {e}")
 
@@ -128,7 +128,7 @@ def save_phonopy_results(phonon, output_prefix, mesh):
     output_paths = []
     for file_to_create in ['FORCE_CONSTANTS', 'band.yaml', 
                            'thermal.yaml', 'total_dos.dat', 
-                           'projected_dis.dat']:
+                           'projected_dos.dat']:
         path = Path(output_prefix / file_to_create)
         path.parent.mkdir(parents=True, exist_ok=True)
         output_paths.append(path)
