@@ -76,7 +76,7 @@ def write_thermal_properties(phonon, output_path, mesh):
         mesh (int): Mesh density for thermal properties.
     """
     try:
-        phonon.run_mesh(mesh)
+        phonon.run_mesh(mesh, with_eigenvectors=True, is_mesh_symmetry=False)
         phonon.run_thermal_properties(t_step=100, t_max=2000, t_min=100, 
                                       cutoff_frequency=0.1)
         phonon.write_yaml_thermal_properties(filename=output_path)
@@ -101,6 +101,21 @@ def write_total_dos(phonon, output_path):
         print(f"[WARNING] Could not write total DOS: {e}")
 
 
+def write_projected_dos(phonon, output_path):
+    """
+    Runs and saves the projected density of states. 
+
+     Args:
+        phonon (Phonopy): The Phonopy object.
+        output_path (Path): Directory where projected_dos.dat will be saved.
+    """
+    try: 
+        phonon.run_projected_dos()
+        phonon.write_total_dos(filename=output_path)
+    except Exception as e: 
+        print(f"[WARNING] Could not write projected DOS: {e}")
+
+
 def save_phonopy_results(phonon, output_prefix, mesh):
     """
     Saves various phonon calculation results to files.
@@ -112,7 +127,8 @@ def save_phonopy_results(phonon, output_prefix, mesh):
     """
     output_paths = []
     for file_to_create in ['FORCE_CONSTANTS', 'band.yaml', 
-                           'thermal.yaml', 'total_dos.dat']:
+                           'thermal.yaml', 'total_dos.dat', 
+                           'projected_dis.dat']:
         path = Path(output_prefix / file_to_create)
         path.parent.mkdir(parents=True, exist_ok=True)
         output_paths.append(path)
@@ -120,6 +136,7 @@ def save_phonopy_results(phonon, output_prefix, mesh):
     write_band_structure(phonon, output_paths[1])
     write_thermal_properties(phonon, output_paths[2], mesh)
     write_total_dos(phonon, output_paths[3])
+    write_projected_dos(phonon, output_paths[4])
 
 
 #====================== Helper Functions for Plotting ======================#
