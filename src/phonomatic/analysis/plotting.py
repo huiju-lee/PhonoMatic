@@ -10,6 +10,8 @@ from phonomatic.utils.io import (
 )
 from itertools import accumulate, cycle
 from pathlib import Path
+
+from collections import defaultdict
     
         
 def plot_phonon_dispersion(
@@ -286,8 +288,8 @@ def plot_all_dispersion_curves(
         max_plots_per_page (int): Maximum number of plots to place on a 
             single page of the PDF.
         common_legend (bool): Whether to add a common legend on each page.
-        legend_params (dict): Optional keyword arguments passed to `fig.legend()`
-            if common_legend is True.
+        legend_params (dict): Optional keyword arguments passed to 
+            `fig.legend()` if common_legend is True.
         axis_kwargs (dict or list of dict): Axis customization options for 
             each plot (xlabel, ylabel, tick_params, title, etc.). The user can
             either provide a single dict, in which case all subplots will 
@@ -341,3 +343,41 @@ def plot_all_dispersion_curves(
 
     # Combine and save to pdf
     save_figures_to_pdf(figures, output_pdf, file_name='band_plots.pdf')
+
+
+#============================= Plot DOS / pDOS =============================#
+def plot_total_dos(total_dos_path):
+    dos_data = np.loadtxt(total_dos_path, comments="#")
+    freq = dos_data[:, 0]
+    dos = dos_data[:, 1]
+    plt.plot(freq, dos)
+    plt.xlabel("Frequency (THz)")
+    plt.ylabel("DOS (states/THz)")
+    plt.show()
+   
+
+def plot_projected_dos(projected_dos_path):
+    pdos_data = np.loadtxt(projected_dos_path, comments="#")
+    material = get_method_and_material(projected_dos_path)[1]
+    
+    # Get atomic symbols in correct order - this should be moved to IO
+    with open(projected_dos_path, 'r') as f:
+        symbols = f.readline().strip()
+    # Remove comment line symbol and split into list of atomic symbols
+    symbols = symbols.lstrip('#').split()  
+    
+    freq = pdos_data[:, 0]
+    densities = pdos_data[:, 1:pdos_data.shape[1]]
+    sym_to_pdos = defaultdict(lambda: np.zeros_like(freq))
+    # Take transpose to iteratre through columns (densities by atom)
+    for sym, density in zip(symbols, densities.T):
+        # Keep running total of density contribution from each atomic species
+        sym_to_pdos[sym] += density
+    
+    # Plot
+    for species, pdos in sym_to_pdos.items():
+        plt.plot(freq, pdos, label=species)
+    plt.xlabel("Frequency (THz)")
+    plt.ylabel("pDOS (states/THz)")
+    plt.legend()
+    plt.show()
