@@ -12,7 +12,67 @@ from itertools import accumulate, cycle
 from pathlib import Path
 
 from collections import defaultdict
+
+
+def _validate_dos_augment(dos_augment):
+    valid_augs = {None, "pdos", "total_dos", "both"}             
+    if dos_augment not in valid_augs:
+        raise ValueError(
+            f"Invalid dos_augment '{dos_augment}'. "
+            f"Must be one of {valid_augs}."
+        )
+
+
+def _setup_dispersion_fig(
+    dos_augment=None, 
+    figure_kwargs=None
+):
+    default_figure_kwargs = {"figsize": (6, 4)}
+    figure_kwargs = {**default_figure_kwargs, **(figure_kwargs or {})}
     
+    if dos_augment is not None:
+        if (dos_augment == 'pdos' or dos_augment == 'total_dos'):
+            cols = 2  # 1 row, 2 columns (panels)
+            width_ratios =  [2, 1]
+        elif dos_augment == 'both':
+            cols = 3
+            width_ratios = [2, 1, 1]
+            
+        fig, axes = plt.subplots(
+            nrows=1,
+            ncols=cols,
+            sharey=(cols > 1),  # Share axis if we have multiple panels
+            gridspec_kw = {"width_ratios": width_ratios},
+            **figure_kwargs
+        )
+    else:
+        fig, ax = plt.subplots(**figure_kwargs)
+        axes = [ax] # Make iterable for consistency
+    return fig, axes
+
+
+def _get_dos_paths(band_yaml_paths, dos_augment):
+    # To be moved to IO later...
+    if dos_augment == 'pdos':
+        return [Path(p).parent / 'projected_dos.dat' for p in band_yaml_paths]
+    elif dos_augment == 'total_dos':
+        return [Path(p).parent / 'total_dos.dat' for p in band_yaml_paths]
+    else:
+        pdos_paths = [Path(p).parent / 'projected_dos.dat' for p in band_yaml_paths]
+        total_paths = [Path(p).parent / 'total_dos.dat' for p in band_yaml_paths]
+        return pdos_paths, total_paths # Separate for ease of access
+
+
+def _add_dos_augment(aug, axs, dos_data_paths):
+    if aug == 'pdos':
+        plot_projected_dos(dos_data_paths, axs[0])
+    elif aug == 'total_dos':
+        plot_total_dos(dos_data_paths, axs[0])
+    else:
+        pdos_paths, total_paths = dos_data_paths
+        plot_projected_dos(pdos_paths, axs[0])
+        plot_total_dos(total_paths, axs[1])
+
         
 def plot_phonon_dispersion(
         yaml_files, 
@@ -23,6 +83,7 @@ def plot_phonon_dispersion(
         figure_kwargs=None, 
         legend_kwargs=None, 
         postprocess=None, 
+        dos_augment=None,
         ax=None    
 ):
     """
@@ -66,10 +127,8 @@ def plot_phonon_dispersion(
     if ax is None:
         own_fig = True
         output_path = create_output_file(output_path, "band_plot.png")
-        default_figure_kwargs = {"figsize": (4, 4)}
-        # Merge user-supplied figure kwargs with defaults
-        figure_kwargs = {**default_figure_kwargs, **(figure_kwargs or {})}
-        fig, ax = plt.subplots(**figure_kwargs)
+        _validate_dos_augment(dos_augment)
+        fig, axes = _setup_dispersion_fig(dos_augment, figure_kwargs)
 
     axis_kwargs = axis_kwargs or {}
     tick_params = axis_kwargs.get(
@@ -82,39 +141,47 @@ def plot_phonon_dispersion(
     xtick_positions = ([0] 
                        + [dist[xticks[j]] for j in range(npath - 1)] 
                        + [dist[xticks[-1] - 1]])
-    ax.set_xticks(xtick_positions)
-    ax.set_xticklabels(xtick_labels)
-    ax.tick_params(**tick_params)
+    dispersion_ax = axes[0]
+    dispersion_ax.set_xticks(xtick_positions)
+    dispersion_ax.set_xticklabels(xtick_labels)
+    dispersion_ax.tick_params(**tick_params)
 
     # Plot datasets
     for (dist, freqs, _, _, _), label in zip(band_data, labels):
         style = next(style_cycler)
         for j in range(freqs.shape[0]):
-            ax.plot(dist, freqs[j], label=label if j == 0 else "", **style)
+            dispersion_ax.plot(dist, freqs[j],
+                               label=label if j == 0 else "", **style)
 
     # Annotate with axis labels
-    ax.set_xlabel(axis_kwargs.get("xlabel", "Wave vector"), 
-                  fontdict=axis_kwargs.get("xlabel_fontdict", {}))
-    ax.set_ylabel(axis_kwargs.get("ylabel", "Frequency (THz)"), 
-                  fontdict=axis_kwargs.get("ylabel_fontdict", {}))
+    dispersion_ax.set_xlabel(axis_kwargs.get("xlabel", "Wave vector"), 
+                             fontdict=axis_kwargs.get("xlabel_fontdict", {}))
+    dispersion_ax.set_ylabel(axis_kwargs.get("ylabel", "Frequency (THz)"), 
+                             fontdict=axis_kwargs.get("ylabel_fontdict", {}))
     # Default title is material ID
-    ax.set_title(axis_kwargs.get("title", 
-                                 get_method_and_material(yaml_files[0])[1]), 
-                 fontdict=axis_kwargs.get("title_fontdict", {}))
+    dispersion_ax.set_title(axis_kwargs.get("title", 
+                                get_method_and_material(yaml_files[0])[1]), 
+                            fontdict=axis_kwargs.get("title_fontdict", {}))
 
     # Set x-axis limits, plot 0-frequency line
-    ax.set_xlim(min(dist), max(dist))
-    ax.axhline(0, linestyle='--', color='lightcoral', lw=0.3)
+    dispersion_ax.set_xlim(min(dist), max(dist))
+    dispersion_ax.axhline(0, linestyle='--', color='lightcoral', lw=0.3)
 
+    # Add subplots for DOS / pDOS
+    dos_axs = axes[1:]
+    if len(dos_axs) > 0:
+        dos_paths = _get_dos_paths(yaml_files, dos_augment)
+        _add_dos_augment(dos_augment, dos_axs, dos_paths)
+        
     # Let the user make additional stylistic changes beyond the parameters
     # included in this function
     if postprocess:
-        postprocess(ax)
+        postprocess(dispersion_ax)
 
     # Save as a single file if we are generating one figure in isolation
     if own_fig:
         # Add legend - if part of a larger PDF we would use a common legend
-        ax.legend(**(legend_kwargs or {}))
+        dispersion_ax.legend(**(legend_kwargs or {}))
         plt.tight_layout()
         save_figure(fig, output_path, file_name="band_plot.png", dpi=300)
 
@@ -346,38 +413,86 @@ def plot_all_dispersion_curves(
 
 
 #============================= Plot DOS / pDOS =============================#
-def plot_total_dos(total_dos_path):
-    dos_data = np.loadtxt(total_dos_path, comments="#")
-    freq = dos_data[:, 0]
-    dos = dos_data[:, 1]
-    plt.plot(freq, dos)
-    plt.xlabel("Frequency (THz)")
-    plt.ylabel("DOS (states/THz)")
-    plt.show()
-   
+def plot_total_dos(total_dos_paths, ax=None):
+    own_fig = False
+    if ax is None:
+        fig, ax = plt.subplots()
+        own_fig = True
 
-def plot_projected_dos(projected_dos_path):
-    pdos_data = np.loadtxt(projected_dos_path, comments="#")
-    material = get_method_and_material(projected_dos_path)[1]
-    
-    # Get atomic symbols in correct order - this should be moved to IO
-    with open(projected_dos_path, 'r') as f:
-        symbols = f.readline().strip()
-    # Remove comment line symbol and split into list of atomic symbols
-    symbols = symbols.lstrip('#').split()  
-    
-    freq = pdos_data[:, 0]
-    densities = pdos_data[:, 1:pdos_data.shape[1]]
-    sym_to_pdos = defaultdict(lambda: np.zeros_like(freq))
-    # Take transpose to iteratre through columns (densities by atom)
-    for sym, density in zip(symbols, densities.T):
-        # Keep running total of density contribution from each atomic species
-        sym_to_pdos[sym] += density
-    
-    # Plot
-    for species, pdos in sym_to_pdos.items():
-        plt.plot(freq, pdos, label=species)
-    plt.xlabel("Frequency (THz)")
-    plt.ylabel("pDOS (states/THz)")
-    plt.legend()
-    plt.show()
+    for path in total_dos_paths:
+        method, _ = get_method_and_material(path)
+        dos_data = np.loadtxt(path, comments="#")
+        freq = dos_data[:, 0]
+        dos = dos_data[:, 1]
+        ax.plot(dos, freq)
+    ax.set_xlabel("DOS (states/THz)")
+    if own_fig:
+        ax.set_ylabel("Frequency (THz)")
+        plt.show()
+
+
+def plot_projected_dos(projected_dos_paths, ax=None):
+    """
+    Plot projected DOS for one material across multiple methods (e.g., mlip vs
+    dft). Can plot standalone or into an existing axis (e.g., as a subplot
+    next to a dispersion plot).
+
+    Args:
+        projected_dos_paths (list[str]): One or more file paths to
+            projected DOS files.
+        ax (matplotlib.axes.Axes, optional): Axis to plot into. If None, a new
+            figure/axis is created.
+    """
+    own_fig = False
+    if ax is None:
+        fig, ax = plt.subplots()
+        own_fig = True
+
+    # Predefine a consistent color map for species
+    color_cycle = cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+    # Add new key (element) -> value is next color in cycle
+    species_colors = defaultdict(lambda: next(color_cycle))
+
+    for path in projected_dos_paths:
+        method, _ = get_method_and_material(path)
+
+        # Linestyle by method - use dashed for mlip by default
+        linestyle = "--" if method.lower() == "mlip" else "-"
+
+        # Load data
+        pdos_data = np.loadtxt(path, comments="#")
+
+        # Read symbols in correct order from top of file
+        with open(path, "r") as f:
+            symbols = f.readline().strip()  
+        symbols = symbols.lstrip("#").split()  
+        
+        # Extract frequency and density arrays 
+        # Set up dictionary to keep cumulative total of density by element
+        freq = pdos_data[:, 0]
+        densities = pdos_data[:, 1:]
+        sym_to_pdos = defaultdict(lambda: np.zeros_like(freq))
+
+        # Aggregate per species
+        for sym, density in zip(symbols, densities.T):
+            sym_to_pdos[sym] += density
+
+        # Plot into axis
+        for species, pdos in sym_to_pdos.items():
+            ax.plot(
+                pdos,
+                freq,
+                label=f"{species} ({method})",
+                color=species_colors[species],
+                linestyle=linestyle,
+            )
+
+    ax.set_xlabel("pDOS (states/THz)")
+    ax.legend()
+    if own_fig:
+        # If we are augmenting with a phonon dispersion plot, 
+        # we'll already have the y-label
+        ax.set_ylabel("Frequency (THz)")
+        plt.show()
+
+
