@@ -15,6 +15,16 @@ from collections import defaultdict
 
 
 def _validate_dos_augment(dos_augment):
+    """
+    Raises a ValueError for invalid DOS augmentations.
+
+    Args: 
+        dos_augment (str):  Whether to augment phonon dispersion 
+            plots with total DOS (`total_dos`), partial DOS (`pdos`), both
+            (`both`), or None. 
+
+    """
+    # This should probably be moved to IO too
     valid_augs = {None, "pdos", "total_dos", "both"}             
     if dos_augment not in valid_augs:
         raise ValueError(
@@ -28,6 +38,23 @@ def _setup_dispersion_fig(
     figure_kwargs=None, 
     num_plots=1
 ):
+    """
+    Creates the figure and axes in which the phonon dispersion curves are 
+    plotted.
+
+    Args:
+        dos_augment (str):  Whether to augment phonon dispersion 
+            plots with total DOS (`total_dos`), partial DOS (`pdos`), both
+            (`both`), or None. 
+        figure_kwargs (dict): Figure customization options (e.g. figsize).
+        num_plots (int): Number of phonon dispersion curves to plot. 
+    Returns:
+        fig (matplotlib.figure.Figure): Figure containing the phonon 
+            dispersion plots. 
+        all_axes (list of list of matplotlib.axes.Axes): Each element of
+            all_axes is group of axes corresponding to a given subplot 
+            (a single phonon dispersion curve and any augmentations). 
+    """
     default_figure_kwargs = {"figsize": (6, 4)}
     figure_kwargs = {**default_figure_kwargs, **(figure_kwargs or {})}
     rows, cols = _get_page_layout(num_plots)
@@ -78,18 +105,48 @@ def _setup_dispersion_fig(
 
 
 def _get_dos_paths(band_yaml_paths, dos_augment):
+    """
+    Derives paths to DOS data given paths to phonon band dispersion data.
+    This assumes results are grouped by material, with the DOS data and band
+    data in the same directory. 
+
+    Args:
+        band_yaml_paths (list of Path): Paths to phonon band dispersion yaml 
+            files. 
+        dos_augment (str): Whether to augment phonon dispersion 
+            plots with total DOS (`total_dos`), partial DOS (`pdos`), or both
+            (`both`).
+    
+    Returns:
+        list of Path: Paths to pDOS .dat files, total DOS .dat files, 
+            or both depeneding on the desired augmentation. 
+    """
     # To be moved to IO later...
     if dos_augment == 'pdos':
         return [Path(p).parent / 'projected_dos.dat' for p in band_yaml_paths]
     elif dos_augment == 'total_dos':
         return [Path(p).parent / 'total_dos.dat' for p in band_yaml_paths]
     else:
-        pdos_paths = [Path(p).parent / 'projected_dos.dat' for p in band_yaml_paths]
-        total_paths = [Path(p).parent / 'total_dos.dat' for p in band_yaml_paths]
+        pdos_paths = [Path(p).parent / 'projected_dos.dat'
+                      for p in band_yaml_paths]
+        total_paths = [Path(p).parent / 'total_dos.dat'
+                       for p in band_yaml_paths]
         return pdos_paths, total_paths # Separate for ease of access
 
 
 def _add_dos_augment(aug, axs, dos_data_paths):
+    """
+    Plots total DOS / projected DOS augments to provided axes. 
+
+    Args: 
+        aug (str): Whether to augment phonon dispersion 
+            plots with total DOS (`total_dos`), partial DOS (`pdos`), or both
+            (`both`).
+        axs (list of matplotlib.axes.Axes): The axes corresponding to the DOS
+            panel augmentations. 
+        dos_data_paths (list of Path): Paths to .dat files containing density
+            of states data. 
+    """
     if aug == 'pdos':
         plot_projected_dos(dos_data_paths, axs[0])
     elif aug == 'total_dos':
@@ -131,7 +188,12 @@ def plot_phonon_dispersion(
         legend_kwargs (dict): Legend customization options.
         postprocess (callable): Function taking `ax` for additional 
             customization.
-        ax (matplotlib.axes.Axes): Optional axis to plot into.
+        dos_augment (str): Optional. Whether to augment phonon dispersion 
+            plots with total DOS (`total_dos`), partial DOS (`pdos`), both
+            (`both`), or None. 
+        axes (list of matplotlib.axes.Axes): Optional axes to plot into.
+            One axis is required for the dispersion plot and one additonal
+            axis is required for each DOS augment. 
     """
     # Prepare labels and styles
     if labels is None:
@@ -185,7 +247,6 @@ def plot_phonon_dispersion(
     for (dist, freqs, _, _, _), label in zip(band_data, labels):
         style = next(style_cycler)
         for j in range(freqs.shape[0]):
-            print("style type:", type(style), style)
             dispersion_ax.plot(dist, freqs[j],
                                label=label if j == 0 else "", **style)
 
@@ -268,7 +329,7 @@ def _make_cycler(param):
         param (Any | list | tuple | None): The parameter to wrap.
 
     Returns:
-        cycle_func(Callable[[], Any]): A function that returns the next 
+        cycle_func(callable): A function that returns the next 
             parameter value when called.
     """
     if param is None:
@@ -311,8 +372,10 @@ def _make_dispersion_page(
             functions taking an `ax` for additional customization of each 
             subplot.
         postprocess_page (callable): Function taking a `fig` and `axs` as
-            arguments for customization of an entire PDF page. 
-    
+            arguments for customization of an entire PDF page.  
+        dos_augment (str): Optional. Whether to augment phonon dispersion 
+            plots with total DOS (`total_dos`), partial DOS (`pdos`), both
+            (`both`), or None. 
     Returns:
         fig (matplotlib.figure.Figure): The page of phonon dispersion curves.
     """
@@ -405,6 +468,9 @@ def plot_all_dispersion_curves(
             subplot.
         postprocess_page (callable): Function taking a `fig` and `axs` as
             arguments for customization of an entire PDF page. 
+        dos_augment (str): Optional. Whether to augment phonon dispersion 
+            plots with total DOS (`total_dos`), partial DOS (`pdos`), both
+            (`both`), or None. 
     """
     results_dir = Path(results_dir)
     
@@ -451,6 +517,16 @@ def plot_all_dispersion_curves(
 
 #============================= Plot DOS / pDOS =============================#
 def plot_total_dos(total_dos_paths, ax=None):
+    """
+    Plot total DOS for one material across multiple methods (e.g., mlip vs 
+    dft). Can plot standalone or into an existing axis.
+
+    Args:
+        projected_dos_paths (list of Path): One or more file paths to
+            projected DOS files.
+        ax (matplotlib.axes.Axes, optional): Axis to plot into. If None, a new
+            figure/axis is created.
+    """
     own_fig = False
     if ax is None:
         fig, ax = plt.subplots()
@@ -471,11 +547,10 @@ def plot_total_dos(total_dos_paths, ax=None):
 def plot_projected_dos(projected_dos_paths, ax=None):
     """
     Plot projected DOS for one material across multiple methods (e.g., mlip vs
-    dft). Can plot standalone or into an existing axis (e.g., as a subplot
-    next to a dispersion plot).
+    dft). Can plot standalone or into an existing axis.
 
     Args:
-        projected_dos_paths (list[str]): One or more file paths to
+        projected_dos_paths (list of Path): One or more file paths to
             projected DOS files.
         ax (matplotlib.axes.Axes, optional): Axis to plot into. If None, a new
             figure/axis is created.
