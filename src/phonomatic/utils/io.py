@@ -112,6 +112,18 @@ def write_projected_dos(phonon, output_path):
     try: 
         phonon.run_projected_dos()
         phonon.write_projected_dos(filename=output_path)
+        symbols = phonon.primitive.symbols
+
+        with open(output_path, 'r') as f:
+            data = f.readlines()
+
+         # Prepend custom header
+        header = "# " + " ".join(symbols) + "\n"
+        data.insert(0, header)
+
+        # Write back
+        with open(output_path, "w") as f:
+            f.writelines(data)
     except Exception as e: 
         print(f"[WARNING] Could not write projected DOS: {e}")
 
